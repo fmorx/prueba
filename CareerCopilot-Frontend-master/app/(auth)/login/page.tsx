@@ -1,0 +1,168 @@
+"use client";
+
+import { supabase } from "@/lib/supabase";
+import { saveSession, translateAuthError } from "@/lib/auth";
+import { Notice } from "@/components/ui/notice";
+import { useState, FormEvent } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { APP_ROUTES } from "@/lib/constants";
+import { ArrowRight, ArrowLeft, Lock, Mail, Stamp } from "lucide-react";
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLogin = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !password) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (authError) {
+        setError(translateAuthError(authError.message));
+        return;
+      }
+      if (!data.session || !data.user) {
+        setError("No se recibió una sesión válida. Inténtalo de nuevo.");
+        return;
+      }
+
+      saveSession(data.session.access_token, {
+        id: data.user.id,
+        email: data.user.email ?? email.trim(),
+        fullName: data.user.user_metadata?.full_name || data.user.email || "Usuario",
+      });
+      router.push(APP_ROUTES.HOME);
+    } catch {
+      setError("No se pudo conectar con el servicio de autenticación. Revisa tu conexión.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
+
+  return (
+    <div className="min-h-screen w-full bg-background text-foreground lg:grid lg:grid-cols-[0.9fr_1.1fr]">
+      <aside className="relative flex h-[40vh] min-h-[250px] max-h-[400px] flex-col justify-center overflow-hidden bg-ink-deep p-5 text-ink-deep-foreground sm:h-[42vh] sm:min-h-[280px] sm:p-8 lg:h-auto lg:min-h-screen lg:p-10 xl:p-14">
+        <div className="relative max-w-sm">
+          <span className="mb-5 flex h-9 w-9 items-center justify-center rounded-sm border border-primary/50 bg-primary/15 text-primary">
+            <Stamp className="h-4.5 w-4.5" />
+          </span>
+          <h1 className="text-3xl font-bold leading-[1.08] tracking-tight sm:text-4xl xl:text-5xl">
+            Inicia sesión
+          </h1>
+          <p className="mt-3 max-w-xs text-sm leading-6 text-ink-deep-foreground/65">
+            Accede a tu expediente de postulación.
+          </p>
+        </div>
+      </aside>
+
+      <main className="relative z-10 -mt-6 flex min-h-[60vh] flex-col rounded-t-md border-t border-border bg-card px-4 py-5 sm:-mt-8 sm:px-10 sm:py-8 lg:z-auto lg:mt-0 lg:min-h-screen lg:rounded-none lg:border-t-0 lg:bg-transparent lg:px-16 lg:py-8 xl:px-24">
+        <div className="flex items-center justify-between">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Volver a la landing
+          </Link>
+        </div>
+
+        <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-start pt-4 sm:pt-8 lg:justify-center lg:py-12">
+          <form onSubmit={handleLogin} className="space-y-5 sm:space-y-6">
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-foreground">
+                Correo electrónico
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="email"
+                  placeholder="tu@correo.com"
+                  className="h-11 bg-card pl-11 text-sm focus-visible:ring-primary sm:h-12"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-bold text-foreground">
+                  Contraseña
+                </label>
+                <Link
+                  href={APP_ROUTES.FORGOT_PASSWORD}
+                  className="text-xs font-semibold text-primary transition-colors hover:text-foreground hover:underline"
+                >
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  className="h-11 bg-card pl-11 text-sm focus-visible:ring-primary sm:h-12"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
+            {error && (
+              <Notice tone="error">
+                {error}
+                {error.toLowerCase().includes("confirmar tu correo") && (
+                  <>
+                    {" "}
+                    <Link href={APP_ROUTES.CONFIRM_EMAIL} className="font-bold underline">
+                      Reenviar correo de confirmación
+                    </Link>
+                  </>
+                )}
+              </Notice>
+            )}
+
+            <Button
+              type="submit"
+              className="h-11 w-full gap-2 text-sm sm:h-12"
+              disabled={isLoading || !email.trim()}
+            >
+              {isLoading ? "Iniciando sesión..." : "Iniciar sesión"}
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </form>
+
+          <div className="mt-6 border-t border-border pt-5 text-center text-sm text-muted-foreground sm:mt-8 sm:pt-6">
+            ¿Aún no tienes cuenta?{" "}
+            <Link
+              href={APP_ROUTES.REGISTER}
+              className="font-bold text-primary transition-colors hover:text-foreground hover:underline"
+            >
+              Regístrate aquí
+            </Link>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}

@@ -1,0 +1,191 @@
+"use client";
+
+import { supabase } from "@/lib/supabase";
+import { getSiteUrl, saveSession, translateAuthError } from "@/lib/auth";
+import { Notice } from "@/components/ui/notice";
+import { useState, FormEvent } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { APP_ROUTES } from "@/lib/constants";
+import { ArrowRight, ArrowLeft, Lock, Mail, User, Stamp } from "lucide-react";
+
+export default function RegisterPage() {
+  const router = useRouter();
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+
+  const handleRegister = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !fullName.trim() || !password) return;
+
+    setIsLoading(true);
+    setError(null);
+    setInfo(null);
+
+    try {
+      const { data, error: authError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: { full_name: fullName.trim() },
+          // A esta página vuelve el usuario al pulsar "Confirmar correo" (ver app/(auth)/confirm-email).
+          emailRedirectTo: `${getSiteUrl()}${APP_ROUTES.CONFIRM_EMAIL}`,
+        },
+      });
+
+      if (authError) {
+        setError(translateAuthError(authError.message));
+        return;
+      }
+      if (!data.session || !data.user) {
+        setInfo("Cuenta creada. Te enviamos un correo: pulsa el enlace de confirmación y te llevaremos directo a tu panel.");
+        return;
+      }
+
+      saveSession(data.session.access_token, {
+        id: data.user.id,
+        email: data.user.email ?? email.trim(),
+        fullName: data.user.user_metadata?.full_name || fullName.trim(),
+      });
+      router.push(APP_ROUTES.HOME);
+    } catch {
+      setError("No se pudo conectar con el servicio de autenticación. Revisa tu conexión.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
+
+
+  return (
+    <div className="min-h-screen w-full bg-background text-foreground lg:grid lg:grid-cols-[0.9fr_1.1fr]">
+      <aside className="relative flex h-[40vh] min-h-[250px] max-h-[400px] flex-col justify-center overflow-hidden bg-ink-deep p-5 text-ink-deep-foreground sm:h-[42vh] sm:min-h-[280px] sm:p-8 lg:h-auto lg:min-h-screen lg:p-10 xl:p-14">
+        <div className="relative max-w-sm">
+          <span className="mb-5 flex h-9 w-9 items-center justify-center rounded-sm border border-primary/50 bg-primary/15 text-primary">
+            <Stamp className="h-4.5 w-4.5" />
+          </span>
+          <h1 className="text-3xl font-bold leading-[1.08] tracking-tight sm:text-4xl xl:text-5xl">
+            Tu próximo paso empieza aquí.
+          </h1>
+          <p className="mt-3 max-w-xs text-sm leading-6 text-ink-deep-foreground/65 sm:mt-4">
+            Abre tu expediente de postulación.
+          </p>
+        </div>
+      </aside>
+
+      <main className="relative z-10 -mt-6 flex min-h-[60vh] flex-col rounded-t-md border-t border-border bg-card px-4 py-5 sm:-mt-8 sm:px-10 sm:py-8 lg:z-auto lg:mt-0 lg:min-h-screen lg:rounded-none lg:border-t-0 lg:bg-transparent lg:px-16 lg:py-8 xl:px-24">
+        <div className="flex items-center justify-between">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Volver a la landing
+          </Link>
+        </div>
+
+        <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-start py-5 sm:py-10 lg:justify-center lg:py-12">
+          <div className="mb-6 sm:mb-8 lg:mb-10">
+            <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              Crea tu cuenta
+            </h2>
+            <p className="mt-3 max-w-sm text-sm leading-6 text-muted-foreground">
+              Configura tu perfil profesional.
+            </p>
+          </div>
+
+          <form onSubmit={handleRegister} className="space-y-4 sm:space-y-5">
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-foreground">
+                Nombre completo
+              </label>
+              <div className="relative">
+                <User className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Ej. Alex Morgan"
+                  className="h-11 bg-card pl-11 text-sm focus-visible:ring-primary sm:h-12"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-foreground">
+                Correo electrónico
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="email"
+                  placeholder="tu@correo.com"
+                  className="h-11 bg-card pl-11 text-sm focus-visible:ring-primary sm:h-12"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <label className="block text-sm font-bold text-foreground">
+                  Contraseña
+                </label>
+                <span className="text-right text-xs font-medium text-muted-foreground">
+                  Mínimo 8 caracteres
+                </span>
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  className="h-11 bg-card pl-11 text-sm focus-visible:ring-primary sm:h-12"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
+            {error && <Notice tone="error">{error}</Notice>}
+            {info && <Notice tone="success">{info}</Notice>}
+
+            <Button
+              type="submit"
+              className="h-11 w-full gap-2 text-sm sm:h-12"
+              disabled={isLoading || !email.trim() || !fullName.trim() || !password.trim()}
+            >
+              {isLoading ? "Creando cuenta..." : "Registrarme"}
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </form>
+
+          <div className="mt-6 border-t border-border pt-5 text-center text-sm text-muted-foreground sm:mt-8 sm:pt-6">
+            ¿Ya tienes una cuenta?{" "}
+            <Link
+              href={APP_ROUTES.LOGIN}
+              className="font-bold text-primary transition-colors hover:text-foreground hover:underline"
+            >
+              Inicia sesión
+            </Link>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
